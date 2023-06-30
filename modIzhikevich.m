@@ -62,7 +62,7 @@ for t=1:T % simulation of 1000 ms
     fired=find(v>=30); % indices of spikes
     firings=[firings; t+0*fired,fired];
     %plasticity
-    S = hebbian_adjust_network_homeostasis(S, fired, 0.05);
+    S = hebbian_adjust(S, fired, 0.05);
     v(fired)=c(fired);
     u(fired)=u(fired)+d(fired);
     I=I+sum(S(:,fired),2);
@@ -80,18 +80,22 @@ xlabel('time (ms)');
 ylabel('neuron');
 
 spike_m = zeros(size(A, 1), max(firings(:,1)));
-for i=1:size(firings, 1)
+for i=1:size(firings, 1) % time on Y, neuron on X
     spike_m(firings(i,2), firings(i,1)) = 1;
 end
 figure;
+subset = (T-200):T;
 subplot(2,1,1)
-plot(sum(spike_m, 1))
-title("Cumultaive spikes")
+plot(sum(spike_m, 1)/size(spike_m,1))
+title("Network bursting")
 xlabel("Time")
+ylabel("Global network activity")
 subplot(2,1,2)
-plot(sum(spike_m, 2))
-title("Cumultaive spikes")
+subset = (T-200):T;
+plot(sum(spike_m(:,subset), 2)/size(spike_m(:,subset),2))
+title(sprintf("Neuron loudness at timesteps %d:%d", subset(1), subset(end)))
 xlabel("Neuron index")
+ylabel("Fraction of time fired")
 %% 
 figure;
 imagesc(Is);
@@ -103,3 +107,26 @@ colormap(RdBu);
 c = max(abs([min(Is(:)),max(Is(:))]));
 clim([-c c]); %center colormap on 0
 colorbar
+
+%% firing statistics
+figure;
+c = corr(transpose(spike_m), 'Type', 'Spearman');
+corrplot = reshape(c, numel(c),1);
+hist(corrplot, 100)
+title("Correlation of spike trains")
+xlabel("Pearson rho")
+ylabel("Count spike train pairs")
+
+% rowsums should be preserved in synaptic scaling
+figure;
+subplot(2,1,1);
+title("Weights before simulation")
+xlabel("Weight magnitude")
+ylabel("Count")
+hist(sum(A,1), 100);
+
+subplot(2,1,2);
+title("Weights after simulation")
+xlabel("Weight magnitude")
+ylabel("Count")
+hist(sum(S,1), 100);
