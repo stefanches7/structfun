@@ -1,0 +1,14 @@
+# side data / books
+*.pdf
+*.ps
+*.txt
+*.zip
+
+# plots
+mementos/
+*.png
+*.jpg
+
+# service files
+*.pyc
+*-checkpoint.ipynb
