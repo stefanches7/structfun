@@ -9,7 +9,7 @@ A = readmatrix("grow_axons\test_colonies\W_2023-05-08_15-45-39.118865.txt");
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 1500; % time steps
+T = 500; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -57,31 +57,48 @@ NOISE_MAX=5;
 Is = zeros(Ne+Ni, T);
 v=-65*ones(Ne+Ni,1); % Initial values of v
 u=b.*v; % Initial values of u
-firings=zeros(Ne+Ni, T); % spike timings
 rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
+plAmps = zeros(Ne + Ni,1);
+ga = zeros(T,1) ;
+beta = 0.7;
+interval_synaptic_scaling = ceil(T/100);
+taua = 10;
+gamma = 1; 
+colsums_weights_0 = sum(S, 2);
+firings=logical(zeros(Ne+Ni,1)); % spike timings
+spike_m = logical(zeros(Ne+Ni,T));
 for t=1:T % simulation of 1000 ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
     fired=find(v>=30); % indices of spikes
-    firings(fired,t) = 1;
+    firings = false;
+    firings(fired) = true;
+    spike_m(fired, t) = true;
+    plAmps(fired) = plAmps(fired) + beta;
+    ga(t) = sum(firings) / length(firings);
     %plasticity
-    S = hebbian_adjust(S, fired, 0.05, rowsums_weights, neurontype_idx);
     v(fired)=c(fired);
     u(fired)=u(fired)+d(fired);
+    S(firings, :) = S(firings, :) + (plAmps.*neurontype_idx)';
+    S(:, firings) = S(:, firings) - plAmps.*neurontype_idx;
+    if (mod(t,interval_synaptic_scaling) == 0)
+        colsums_weights_t = sum(S, 2);
+        S = transpose(S' .* (colsums_weights_0 / colsums_weights_t));
+    end
     I=I+sum(S(:,fired),2);
     Is(:,t) = I;
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % step 0.5 ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % for numerical
     u=u+a.*(b.*v-u); % stability
+    plAmps = plAmps - plAmps / taua;
+    plAmps(plAmps < 0 ) = 0;
 end
 
 %% PLOT RESULTS
 % Raster plot. Time on X, neuron on Y.
-% figure;
-% movegui;
-% scatter(firings(:,1),firings(:,2), "."); 
-% xlabel('time (ms)');
-% ylabel('neuron');
+figure;
+imagesc(firings)
+colormap hot
 
 spike_m = firings; 
 % spike_m = zeros(size(A, 1), max(firings(:,1)));
@@ -123,19 +140,19 @@ xlabel("Pearson rho")
 ylabel("Count spike train pairs")
 
 % rowsums should be preserved in synaptic scaling
-figure;
-movegui;
-subplot(2,1,1);
+figure
+movegui
+subplot(2,1,1)
+hist(sum(A,1), 100)
 title("Weights before simulation")
 xlabel("Weight magnitude")
 ylabel("Count")
-hist(sum(A,1), 100);
 
-subplot(2,1,2);
+subplot(2,1,2)
+hist(sum(S,1), 100)
 title("Weights after simulation")
 xlabel("Weight magnitude")
 ylabel("Count")
-hist(sum(S,1), 100);
 
 figure
 movegui

@@ -5,8 +5,8 @@ import grow_axons
 root_output_folder = "C:\\Users\\stefa\\Documents\\Masterarbeit\\grow_axons\\test_colonies"
 
 # parameters:
-r   = 1.5   # culture radius (mm)
-rho = 400   # neuron density (neurons mm^-2)
+r   = 1   # culture radius (mm)
+rho = 300   # neuron density (neurons mm^-2)
 Lmu = 1.0   # mean axon length
 
 r_soma = 7.5e-3 # soma size (mm)
