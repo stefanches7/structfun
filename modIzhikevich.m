@@ -5,7 +5,7 @@
 close all;
 clear all;
 % 1- NETWORK SIZE:
-A = readmatrix("grow_axons\test_colonies\W_2023-05-08_15-45-39.118865.txt");
+A = readmatrix("C:\Users\stefa\Documents\Masterarbeit\grow_axons\test_colonies\W_2023-07-07_14-47-00.243216.txt");
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
@@ -97,10 +97,9 @@ end
 %% PLOT RESULTS
 % Raster plot. Time on X, neuron on Y.
 figure;
-imagesc(firings)
+imagesc(spike_m)
 colormap hot
 
-spike_m = firings; 
 % spike_m = zeros(size(A, 1), max(firings(:,1)));
 % for i=1:size(firings, 1) % time on Y, neuron on X
 %     spike_m(firings(i,2), firings(i,1)) = 1;
