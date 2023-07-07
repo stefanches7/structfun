@@ -61,11 +61,12 @@ rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 plAmps = zeros(Ne + Ni,1);
 ga = zeros(T,1) ;
-beta = 1;
-interval_synaptic_scaling = ceil(T/100);
+beta = 0.01;
+interval_synaptic_scaling = ceil(T/1000);
 taua = 1;
 gamma = 1; 
-colsums_weights_0 = sum(S, 2);
+colsums_weights_0 = sum(S, 1);
+weightsums = zeros(T, 1);
 firings=logical(zeros(Ne+Ni,1)); % spike timings
 spike_m = logical(zeros(Ne+Ni,T));
 for t=1:T % simulation of 1000 ms
@@ -81,9 +82,10 @@ for t=1:T % simulation of 1000 ms
     u(fired)=u(fired)+d(fired);
     S(firings, :) = S(firings, :) + (plAmps.*neurontype_idx)';
     S(:, firings) = S(:, firings) - plAmps.*neurontype_idx;
+    weightsums(t) = sum(abs(S), "all");
     if (mod(t,interval_synaptic_scaling) == 0)
-        colsums_weights_t = sum(S, 2);
-        S = S .* (colsums_weights_0 / colsums_weights_t)';
+        colsums_weights_t = sum(S, 1);
+        S = S .* (colsums_weights_0 ./ colsums_weights_t)';
     end
     I=I+sum(S(:,fired),2);
     Is(:,t) = I;
@@ -165,3 +167,6 @@ imagesc(A)
 title("Weights before simulation")
 colormap hot
 colorbar
+
+figure
+plot(weightsums)
