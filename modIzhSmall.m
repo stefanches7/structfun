@@ -1,7 +1,6 @@
 % Created by Eugene M. Izhikevich, February 25, 2003
 % Excitatory neurons Inhibitory neurons
 function [] = modIzhSmall()
-%% SET UP THE NETWORK
 close all;
 clear all;
 % 1- NETWORK SIZE:
@@ -9,7 +8,7 @@ A = readmatrix("C:\Users\stefa\Documents\Masterarbeit\grow_axons\test_colonies\W
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 50000; % time steps
+T = 500000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -23,7 +22,7 @@ d=[8-6*re.^2; 2*ones(Ni,1)];
 % 3 - SET UP THE CONNECTIVITY MATRIX: DIRECTED NETWORK
 % In this construction, 1=connection exist, 0=no connection.
 % Connectivity is set as random. Then, a fraction of connections are set 0.
-% Note that effectively this is an Erdцs-Rйnyi graphs, with no spatial
+% Note that effectively this is an Erdös-Rényi graphs, with no spatial
 % characteristics. % If you want to symmetrize the network to make 
 % undirected networks (not realistic in neuroscience), use A = (A + A.')/2
 % after line 27.
@@ -61,9 +60,9 @@ rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 plAmps = zeros(Ne + Ni,1);
 ga = zeros(T,1) ;
-beta = 0.7;
+beta = 2;
 interval_synaptic_scaling = ceil(T/100);
-taua = 10;
+taua = 2;
 gamma = 1; 
 colsums_weights_0 = sum(S, 2);
 firings=logical(zeros(Ne+Ni,1)); % spike timings
@@ -83,7 +82,7 @@ for t=1:T % simulation of 1000 ms
     S(:, firings) = S(:, firings) - plAmps.*neurontype_idx;
     if (mod(t,interval_synaptic_scaling) == 0)
         colsums_weights_t = sum(S, 2);
-        S = S .* (colsums_weights_0 ./ colsums_weights_t)';
+        S = S .* (colsums_weights_0 / colsums_weights_t)';
     end
     I=I+sum(S(:,fired),2);
     Is(:,t) = I;
@@ -93,5 +92,6 @@ for t=1:T % simulation of 1000 ms
     plAmps = plAmps - plAmps / taua;
     plAmps(plAmps < 0 ) = 0;
 end
+
 
 end

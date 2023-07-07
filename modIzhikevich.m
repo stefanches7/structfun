@@ -3,13 +3,13 @@
 
 %% SET UP THE NETWORK
 close all;
-clear all;
+%clear all;
 % 1- NETWORK SIZE:
-A = readmatrix("C:\Users\stefa\Documents\Masterarbeit\grow_axons\test_colonies\W_2023-07-07_14-47-00.243216.txt");
+%A = readmatrix("C:\Users\stefa\Documents\Masterarbeit\grow_axons\test_colonies\W_2023-07-07_14-47-00.243216.txt");
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 500; % time steps
+T = 50000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -61,9 +61,9 @@ rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 plAmps = zeros(Ne + Ni,1);
 ga = zeros(T,1) ;
-beta = 0.7;
+beta = 1;
 interval_synaptic_scaling = ceil(T/100);
-taua = 10;
+taua = 1;
 gamma = 1; 
 colsums_weights_0 = sum(S, 2);
 firings=logical(zeros(Ne+Ni,1)); % spike timings
@@ -83,7 +83,7 @@ for t=1:T % simulation of 1000 ms
     S(:, firings) = S(:, firings) - plAmps.*neurontype_idx;
     if (mod(t,interval_synaptic_scaling) == 0)
         colsums_weights_t = sum(S, 2);
-        S = transpose(S' .* (colsums_weights_0 / colsums_weights_t));
+        S = S .* (colsums_weights_0 / colsums_weights_t)';
     end
     I=I+sum(S(:,fired),2);
     Is(:,t) = I;
