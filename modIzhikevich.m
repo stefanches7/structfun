@@ -9,7 +9,7 @@ close all;
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 50000; % time steps
+T = 1000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -54,21 +54,24 @@ NOISE_MAX=5;
 
 
 %% MAIN SIMULATION:
-Is = zeros(Ne+Ni, T);
 v=-65*ones(Ne+Ni,1); % Initial values of v
 u=b.*v; % Initial values of u
 rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 plAmps = zeros(Ne + Ni,1);
 ga = zeros(T,1) ;
-beta = 0.01;
+beta = 0.5;
 interval_synaptic_scaling = ceil(T/1000);
-taua = 1;
+taua = 8;
 gamma = 1; 
 colsums_weights_0 = sum(S, 1);
-weightsums = zeros(T, 1);
+allweightsums = zeros(T, 1);
+colsums = zeros(Ne+Ni, T);
+S_hist = zeros(Ne+Ni,Ne+Ni, T);
 firings=logical(zeros(Ne+Ni,1)); % spike timings
 spike_m = logical(zeros(Ne+Ni,T));
+delta_w = zeros(Ne + Ni, Ne + Ni);
+I = zeros(1,Ne+Ni);
 for t=1:T % simulation of 1000 ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
     fired=find(v>=30); % indices of spikes
@@ -80,15 +83,33 @@ for t=1:T % simulation of 1000 ms
     %plasticity
     v(fired)=c(fired);
     u(fired)=u(fired)+d(fired);
-    S(firings, :) = S(firings, :) + (plAmps.*neurontype_idx)';
-    S(:, firings) = S(:, firings) - plAmps.*neurontype_idx;
-    weightsums(t) = sum(abs(S), "all");
-    if (mod(t,interval_synaptic_scaling) == 0)
-        colsums_weights_t = sum(S, 1);
-        S = S .* (colsums_weights_0 ./ colsums_weights_t)';
+
+    delta_w = zeros(Ne + Ni, Ne + Ni);
+    delta_w(firings,:) = delta_w(firings,:) + (plAmps.*neurontype_idx)';
+    delta_w(:, firings) = delta_w(:, firings) - plAmps.*neurontype_idx;
+    delta_w(A==0) = 0;
+    for i = 1:(Ne+Ni)
+        idx = delta_w(:,i)~=0;
+        m = mean(delta_w(idx,i));
+        delta_w(idx,i) = delta_w(idx,i) - m;
     end
+    
+    overshoot_exc = -delta_w(A==1) > S(A==1);
+    overshoot_inh = -delta_w(A==-1) < S(A==-1);
+    delta_w(overshoot_exc) = 0.99*S(overshoot_exc);
+    delta_w(overshoot_inh) = -0.99*S(overshoot_inh);
+
+    S = S + delta_w;
+    %S_hist(:,:,t) = S;
+    allweightsums(t) = sum(abs(S), "all");
+    %colsums(:,t) = sum(S,1);
+    
+    if (mod(t, 1000) == 0) 
+        colsums = sum(S,1);
+        S = S .* (colsums ./ colsums_weights_0);
+    end
+
     I=I+sum(S(:,fired),2);
-    Is(:,t) = I;
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % step 0.5 ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % for numerical
     u=u+a.*(b.*v-u); % stability
@@ -169,4 +190,4 @@ colormap hot
 colorbar
 
 figure
-plot(weightsums)
+plot(allweightsums)
