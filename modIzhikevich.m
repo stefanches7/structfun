@@ -4,12 +4,14 @@
 %% SET UP THE NETWORK
 close all;
 %clear all;
+
 % 1- NETWORK SIZE:
-%A = readmatrix("C:\Users\stefa\Documents\Masterarbeit\grow_axons\test_colonies\W_2023-07-07_14-47-00.243216.txt");
+A = readmatrix("C:\Users\stefa\Documents\Masterarbeit\grow_axons\test_colonies\W_2023-07-07_14-47-00.243216.txt");
+sprintf("Begin: %s", datetime)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 10000; % time steps
+T = 20000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -60,13 +62,13 @@ rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 plAmps = zeros(Ne + Ni,1);
 ga = zeros(T,1) ;
-beta = 0.002;
-taua = 3;
+beta = 0.02;
+taua = 4;
 gamma = 1; 
 colsums_weights_0 = sum(S, 1);
 allweightsums = zeros(T, 1);
-colsums = zeros(Ne+Ni, T);
-S_hist = zeros(Ne+Ni,Ne+Ni, T);
+%colsums = zeros(Ne+Ni, T);
+%S_hist = zeros(Ne+Ni,Ne+Ni, T);
 firings=false(Ne+Ni,1); % spike timings
 spike_m = false(Ne+Ni,T);
 delta_w = zeros(Ne + Ni, Ne + Ni);
@@ -93,21 +95,14 @@ for t=1:T % simulation of 1000 ms
     %     delta_w(idx,i) = delta_w(idx,i) - m;
     % end
     
-    overshoot_exc = -delta_w(A==1) > S(A==1);
-    overshoot_inh = -delta_w(A==-1) < S(A==-1);
-    delta_w(overshoot_exc) = -0.99*S(overshoot_exc);
-    delta_w(overshoot_inh) = -0.99*S(overshoot_inh);
-
     S = S + delta_w;
-    S_hist(:,:,t) = S;
-    colsums(:,t) = sum(S,1);
     
-    if (mod(t, 100) == 0) 
-        colsum = sum(S,1);
-        sf = (colsums_weights_0 ./ colsum);
-        S = S .* sf;
-    end    
-    allweightsums(t) = sum(S, "all");
+    % if (mod(t, 100) == 0) 
+    %     colsum = sum(S,1);
+    %     sf = (colsums_weights_0 ./ colsum);
+    %     S = S .* sf;
+    % end    
+    %allweightsums(t) = sum(S, "all");
 
 
     I=I+sum(S(:,fired),2);
@@ -117,7 +112,7 @@ for t=1:T % simulation of 1000 ms
     plAmps = plAmps - plAmps / taua;
     plAmps(plAmps < 0 ) = 0;
 end
-
+sprintf("End: %s", datetime)
 %% PLOT RESULTS
 % Raster plot. Time on X, neuron on Y.
 figure;
@@ -128,7 +123,7 @@ colormap hot
 % for i=1:size(firings, 1) % time on Y, neuron on X
 %     spike_m(firings(i,2), firings(i,1)) = 1;
 % end
-figure;
+figure
 t_end = size(spike_m, 2);
 subplot(2,1,1)
 plot(sum(spike_m, 1)/size(spike_m,1))
@@ -154,14 +149,6 @@ ylabel("Fraction of time fired")
 % colorbar
 
 %% firing statistics
-figure;
-c = corr(transpose(spike_m), 'Type', 'Pearson', 'rows','complete');
-corrplot = reshape(c, numel(c),1);
-hist(corrplot, 100)
-title("Correlation of spike trains")
-xlabel("Pearson rho")
-ylabel("Count spike train pairs")
-
 % rowsums should be preserved in synaptic scaling
 figure
 movegui
@@ -190,5 +177,20 @@ title("Weights before simulation")
 colormap hot
 colorbar
 
-figure
-plot(allweightsums)
+%% rate correlations
+bin_size = 100; %ms
+binned_spikes = zeros(Ne+Ni, T/bin_size);
+for i=1:(T/bin_size - 1)
+    for nidx=1:Ne+Ni
+        binned_spikes(nidx,i)=sum(spike_m(nidx, i*bin_size:(i+1)*bin_size))*bin_size/1000;
+    end
+end
+
+figure;
+c = corr(transpose(binned_spikes), 'Type', 'Spearman', 'rows','complete');
+corrplot = reshape(c, numel(c),1);
+hist(corrplot, 100)
+title("Correlation of spike trains")
+xlabel("Pearson rho")
+ylabel("Count spike train pairs")
+
