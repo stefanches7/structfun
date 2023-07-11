@@ -67,15 +67,15 @@ gamma = 1;
 colsums_weights_0 = sum(S, 1);
 allweightsums = zeros(T, 1);
 colsums = zeros(Ne+Ni, T);
-S_hist = zeros(Ne+Ni,Ne+Ni, T);
-firings=logical(zeros(Ne+Ni,1)); % spike timings
-spike_m = logical(zeros(Ne+Ni,T));
+%S_hist = zeros(Ne+Ni,Ne+Ni, T);
+firings=false(Ne+Ni,1); % spike timings
+spike_m = false(Ne+Ni,T);
 delta_w = zeros(Ne + Ni, Ne + Ni);
 I = zeros(1,Ne+Ni);
 for t=1:T % simulation of 1000 ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
     fired=find(v>=30); % indices of spikes
-    firings = false;
+    firings = false(Ne+Ni, 1);
     firings(fired) = true;
     spike_m(fired, t) = true;
     plAmps(fired) = plAmps(fired) + beta;
@@ -88,25 +88,26 @@ for t=1:T % simulation of 1000 ms
     delta_w(firings,:) = delta_w(firings,:) + (plAmps.*neurontype_idx)';
     delta_w(:, firings) = delta_w(:, firings) - plAmps.*neurontype_idx;
     delta_w(A==0) = 0;
-    for i = 1:(Ne+Ni)
-        idx = delta_w(:,i)~=0;
-        m = mean(delta_w(idx,i));
-        delta_w(idx,i) = delta_w(idx,i) - m;
-    end
+    % for i = 1:(Ne+Ni)
+    %     idx = delta_w(:,i)~=0;
+    %     m = mean(delta_w(idx,i));
+    %     delta_w(idx,i) = delta_w(idx,i) - m;
+    % end
     
-    overshoot_exc = -delta_w(A==1) > S(A==1);
-    overshoot_inh = -delta_w(A==-1) < S(A==-1);
-    delta_w(overshoot_exc) = 0.99*S(overshoot_exc);
-    delta_w(overshoot_inh) = -0.99*S(overshoot_inh);
+    % overshoot_exc = -delta_w(A==1) > S(A==1);
+    % overshoot_inh = -delta_w(A==-1) < S(A==-1);
+    % delta_w(overshoot_exc) = -0.99*S(overshoot_exc);
+    % delta_w(overshoot_inh) = -0.99*S(overshoot_inh);
 
     S = S + delta_w;
-    %S_hist(:,:,t) = S;
+    S_hist(:,:,t) = S;
     allweightsums(t) = sum(abs(S), "all");
-    %colsums(:,t) = sum(S,1);
+    colsums(:,t) = sum(S,1);
     
-    if (mod(t, 1000) == 0) 
-        colsums = sum(S,1);
-        S = S .* (colsums ./ colsums_weights_0);
+    if (mod(t, 10) == 0) 
+        colsum = sum(S,1);
+        sf = (colsums_weights_0 ./ colsum);
+        S = S .* sf;
     end
 
     I=I+sum(S(:,fired),2);
@@ -154,7 +155,7 @@ ylabel("Fraction of time fired")
 
 %% firing statistics
 figure;
-c = corr(transpose(spike_m), 'Type', 'Spearman');
+c = corr(transpose(spike_m), 'Type', 'Pearson', 'rows','complete');
 corrplot = reshape(c, numel(c),1);
 hist(corrplot, 100)
 title("Correlation of spike trains")
