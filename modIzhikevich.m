@@ -9,7 +9,7 @@ close all;
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 1000; % time steps
+T = 10000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -60,14 +60,13 @@ rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 plAmps = zeros(Ne + Ni,1);
 ga = zeros(T,1) ;
-beta = 0.5;
-interval_synaptic_scaling = ceil(T/1000);
-taua = 8;
+beta = 0.002;
+taua = 3;
 gamma = 1; 
 colsums_weights_0 = sum(S, 1);
 allweightsums = zeros(T, 1);
 colsums = zeros(Ne+Ni, T);
-%S_hist = zeros(Ne+Ni,Ne+Ni, T);
+S_hist = zeros(Ne+Ni,Ne+Ni, T);
 firings=false(Ne+Ni,1); % spike timings
 spike_m = false(Ne+Ni,T);
 delta_w = zeros(Ne + Ni, Ne + Ni);
@@ -94,21 +93,22 @@ for t=1:T % simulation of 1000 ms
     %     delta_w(idx,i) = delta_w(idx,i) - m;
     % end
     
-    % overshoot_exc = -delta_w(A==1) > S(A==1);
-    % overshoot_inh = -delta_w(A==-1) < S(A==-1);
-    % delta_w(overshoot_exc) = -0.99*S(overshoot_exc);
-    % delta_w(overshoot_inh) = -0.99*S(overshoot_inh);
+    overshoot_exc = -delta_w(A==1) > S(A==1);
+    overshoot_inh = -delta_w(A==-1) < S(A==-1);
+    delta_w(overshoot_exc) = -0.99*S(overshoot_exc);
+    delta_w(overshoot_inh) = -0.99*S(overshoot_inh);
 
     S = S + delta_w;
     S_hist(:,:,t) = S;
-    allweightsums(t) = sum(abs(S), "all");
     colsums(:,t) = sum(S,1);
     
-    if (mod(t, 10) == 0) 
+    if (mod(t, 100) == 0) 
         colsum = sum(S,1);
         sf = (colsums_weights_0 ./ colsum);
         S = S .* sf;
-    end
+    end    
+    allweightsums(t) = sum(S, "all");
+
 
     I=I+sum(S(:,fired),2);
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % step 0.5 ms
