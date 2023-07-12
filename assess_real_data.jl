@@ -23,4 +23,4 @@ end
 
 plot(sum(contr_m, dims = 2), title = "Spikes per neuron: control")
 
-pythonplot();
+plot(spike_m[500,:] )
