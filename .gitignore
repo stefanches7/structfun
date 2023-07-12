@@ -1,6 +1,7 @@
 # side data / books
 *.pdf
 *.ps
+real_data/
 *.txt
 *.zip
 
@@ -12,3 +13,4 @@ mementos/
 # service files
 *.pyc
 *-checkpoint.ipynb
+*.asv
