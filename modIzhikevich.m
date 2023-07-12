@@ -40,15 +40,11 @@ d=[8-6*re.^2; 2*ones(Ni,1)];
 % Increase the max. excitatory weigth to induce synchronization.
 % Be careful. The balance between excitation and inhibition governs the
 % dynamics of the network!
-MAX_EXC_WEIGTH=5; MAX_INH_WEIGTH=.5; 
+MAX_EXC_WEIGTH=10; MAX_INH_WEIGTH=1; 
 S = A;
 S(S>0) = MAX_EXC_WEIGTH*S(S>0).*rand(size(S(S>0)));
 S(S<0) = MAX_INH_WEIGTH*S(S<0).*rand(size(S(S<0)));
-%W=[MAX_EXC_WEIGTH*rand(Ne+Ni,Ne), -MAX_INH_WEIGTH*rand(Ne+Ni,Ni)];
-
-% 5 - The final connectivity matrix S is the element-wise multiplication of A
-% and W.
-%S=A.*W;  % Note that S is directed and weighted!!
+S_0 = S;
 
 % 6 - DEFINE NOISE STRENGTH. Remember that noise (or random inputs) is the
 % main drive of spontaneous activity. Default is around 5. 
@@ -60,57 +56,68 @@ v=-65*ones(Ne+Ni,1); % Initial values of v
 u=b.*v; % Initial values of u
 rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
-plAmps = zeros(Ne + Ni,1);
+
 ga = zeros(T,1) ;
-beta = 0.02;
-taua = 4;
-gamma = 1; 
+
 colsums_weights_0 = sum(S, 1);
-allweightsums = zeros(T, 1);
-%colsums = zeros(Ne+Ni, T);
-%S_hist = zeros(Ne+Ni,Ne+Ni, T);
 firings=false(Ne+Ni,1); % spike timings
 spike_m = false(Ne+Ni,T);
-delta_w = zeros(Ne + Ni, Ne + Ni);
 I = zeros(1,Ne+Ni);
+
+%plasticity related
+plAmps = zeros(Ne + Ni,1);
+delta_w = zeros(Ne + Ni, Ne + Ni);
+beta_hebb = 0.02;
+tauA = 4;
+gamma = 1; % colony firing efficiency (CNQX effects)
+synDs = ones(Ne+Ni,1);
+beta_depr = 0.2;
+tauD = 10;
+
+% debug vars
+%allweightsums = zeros(T, 1);
+%colsums = zeros(Ne+Ni, T);
+%S_hist = zeros(Ne+Ni,Ne+Ni, T);
+
 for t=1:T % simulation of 1000 ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
     fired=find(v>=30); % indices of spikes
     firings = false(Ne+Ni, 1);
     firings(fired) = true;
     spike_m(fired, t) = true;
-    plAmps(fired) = plAmps(fired) + beta;
-    ga(t) = sum(firings) / length(firings);
-    %plasticity
-    v(fired)=c(fired);
-    u(fired)=u(fired)+d(fired);
 
+    ga(t) = sum(firings) / length(firings);
+    
+    % Hebbian plasticity
+    plAmps(fired) = plAmps(fired) + beta_hebb;
     delta_w = zeros(Ne + Ni, Ne + Ni);
     delta_w(firings,:) = delta_w(firings,:) + (plAmps.*neurontype_idx)';
     delta_w(:, firings) = delta_w(:, firings) - plAmps.*neurontype_idx;
     delta_w(A==0) = 0;
-    % for i = 1:(Ne+Ni)
-    %     idx = delta_w(:,i)~=0;
-    %     m = mean(delta_w(idx,i));
-    %     delta_w(idx,i) = delta_w(idx,i) - m;
-    % end
-    
     S = S + delta_w;
     
-    % if (mod(t, 100) == 0) 
-    %     colsum = sum(S,1);
-    %     sf = (colsums_weights_0 ./ colsum);
-    %     S = S .* sf;
-    % end    
+    % synaptic scaling
+    if (mod(t, 100) == 0) 
+        colsum = sum(S,1);
+        sf = (colsums_weights_0 ./ colsum);
+        S = S .* sf;
+    end    
+
+
     %allweightsums(t) = sum(S, "all");
 
+    v(fired)=c(fired);
+    u(fired)=u(fired)+d(fired);
 
-    I=I+sum(S(:,fired),2);
+    I=I+sum(S(:,fired).*(synDs(fired))',2);
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % step 0.5 ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % for numerical
     u=u+a.*(b.*v-u); % stability
-    plAmps = plAmps - plAmps / taua;
+    
+    plAmps = plAmps - plAmps / tauA;
     plAmps(plAmps < 0 ) = 0;
+    synDs(fired) = beta_depr*synDs(fired);
+    synDs = synDs + (1-synDs)/tauD;
 end
 sprintf("End: %s", datetime)
 %% PLOT RESULTS
@@ -119,11 +126,9 @@ figure;
 imagesc(spike_m)
 colormap hot
 
-% spike_m = zeros(size(A, 1), max(firings(:,1)));
-% for i=1:size(firings, 1) % time on Y, neuron on X
-%     spike_m(firings(i,2), firings(i,1)) = 1;
-% end
+
 figure
+movegui
 t_end = size(spike_m, 2);
 subplot(2,1,1)
 plot(sum(spike_m, 1)/size(spike_m,1))
@@ -136,30 +141,19 @@ plot(sum(spike_m(:,subset), 2)/size(spike_m(:,subset),2))
 title(sprintf("Neuron loudness at timesteps %d:%d", subset(1), subset(end)))
 xlabel("Neuron index")
 ylabel("Fraction of time fired")
-%% 
-% figure;
-% imagesc(Is);
-% title("Input current")
-% ylabel("Neuron index")
-% xlabel("Time")
-% load('RdBu_cmap.mat')
-% colormap(RdBu);
-% c = max(abs([min(Is(:)),max(Is(:))]));
-% clim([-c c]); %center colormap on 0
-% colorbar
 
 %% firing statistics
 % rowsums should be preserved in synaptic scaling
 figure
 movegui
 subplot(2,1,1)
-hist(sum(A,1), 100)
+hist(sum(S_0,2), 100)
 title("Weights before simulation")
 xlabel("Weight magnitude")
 ylabel("Count")
 
 subplot(2,1,2)
-hist(sum(S,1), 100)
+hist(sum(S,2), 100)
 title("Weights after simulation")
 xlabel("Weight magnitude")
 ylabel("Count")
@@ -172,25 +166,25 @@ title("Weights after simulation")
 colormap hot
 colorbar
 subplot(2,1,2);
-imagesc(A)
+imagesc(S_0)
 title("Weights before simulation")
 colormap hot
 colorbar
 
 %% rate correlations
-bin_size = 100; %ms
-binned_spikes = zeros(Ne+Ni, T/bin_size);
-for i=1:(T/bin_size - 1)
-    for nidx=1:Ne+Ni
-        binned_spikes(nidx,i)=sum(spike_m(nidx, i*bin_size:(i+1)*bin_size))*bin_size/1000;
-    end
-end
-
-figure;
-c = corr(transpose(binned_spikes), 'Type', 'Spearman', 'rows','complete');
-corrplot = reshape(c, numel(c),1);
-hist(corrplot, 100)
-title("Correlation of spike trains")
-xlabel("Pearson rho")
-ylabel("Count spike train pairs")
+% bin_size = 100; %ms
+% binned_spikes = zeros(Ne+Ni, T/bin_size);
+% for i=1:(T/bin_size - 1)
+%     for nidx=1:Ne+Ni
+%         binned_spikes(nidx,i)=sum(spike_m(nidx, i*bin_size:(i+1)*bin_size))*bin_size/1000;
+%     end
+% end
+% 
+% figure;
+% c = corr(transpose(binned_spikes), 'Type', 'Spearman', 'rows','complete');
+% corrplot = reshape(c, numel(c),1);
+% hist(corrplot, 100)
+% title("Correlation of spike trains")
+% xlabel("Pearson rho")
+% ylabel("Count spike train pairs")
 
