@@ -11,7 +11,7 @@ sprintf("Begin: %s", datetime)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 20000; % time steps
+T = 2000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -69,17 +69,25 @@ plAmps = zeros(Ne + Ni,1);
 delta_w = zeros(Ne + Ni, Ne + Ni);
 beta_hebb = 0.02;
 tauA = 4;
-gamma = 1; % colony firing efficiency (CNQX effects)
 synDs = ones(Ne+Ni,1);
-beta_depr = 0.2;
-tauD = 10;
+beta_depr = 0.8;
+tauD = 500;
+
+%chemicals effects
+gamma = ones(T+1, Ne+Ni); % CNQX effects
+tPlusCnqx = 100; %CNQX added
+gCNQXplus = 0.2;
+gCNQXplusMax = 0.5;
+tauRel = 200; %ms
+tCnqxWashoff = 1000;
+gCNQXminus = 1.5;
 
 % debug vars
 %allweightsums = zeros(T, 1);
 %colsums = zeros(Ne+Ni, T);
 %S_hist = zeros(Ne+Ni,Ne+Ni, T);
 
-for t=1:T % simulation of 1000 ms
+for t=1:T % simulation of T ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
     fired=find(v>=30); % indices of spikes
     firings = false(Ne+Ni, 1);
@@ -102,14 +110,29 @@ for t=1:T % simulation of 1000 ms
         sf = (colsums_weights_0 ./ colsum);
         S = S .* sf;
     end    
-
+    
+    % % chemical environment factors
+    % if (t == tPlusCnqx)
+    %     gamma(t,1:(Ne-1)) = gCNQXplus;
+    % elseif (t == tCnqxWashoff) 
+    %     gamma(t,1:(Ne-1)) = gCNQXminus;
+    % end
+    % 
+    % if (t > tPlusCnqx && t < tCnqxWashoff)
+    %     gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (gCNQXplusMax - gamma(t-1,1:(Ne-1)))/tauRel;
+    % elseif (t > tCnqxWashoff)
+    %     gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (1 - gamma(t-1,1:(Ne-1)))/tauRel;
+    % end
 
     %allweightsums(t) = sum(S, "all");
 
     v(fired)=c(fired);
     u(fired)=u(fired)+d(fired);
 
-    I=I+sum(S(:,fired).*(synDs(fired))',2);
+    I=I+sum(S(:,fired).* ...
+        (synDs(fired))' .* ... %synaptic metabolites exhaustion
+        gamma(t,fired) ... %CNQX addition modificator
+        ,2);
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % step 0.5 ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % for numerical
     u=u+a.*(b.*v-u); % stability
