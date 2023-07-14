@@ -39,6 +39,8 @@ contr_m = zeros(Int8,Int(N), Int(maximum(times)));
 for i=eachindex(times)
     contr_m[Int(spikes_div13_0[i,1]),Int(times[i])] = 1;
 end
+p = heatmap(contr_m, size = (3000, 1400), dpi = 200, xlabel = "Time [centisecond]");
+savefig(p,"real_data/plot/DIV13_dis10.1_APV0_BIC0_CNQX0_SPIKES.png");
 
 
 N = maximum(spikes_div17_10mwash[:,1]);
@@ -56,13 +58,16 @@ spikes_m_div13_cnqx900 = zeros(Int8,Int(N), Int(maximum(times)));
 for i=eachindex(times)
     spikes_m_div13_cnqx900[Int(spikes_div13_cnqx900[i,1]),Int(times[i])] = 1;
 end
+p = heatmap(spikes_m_div13_cnqx900, size = (3000, 1400), 
+    dpi = 200, xlabel = "Time [centisecond]");
+savefig(p,"real_data/plot/DIV13_dis10.1_APV20_BIC40_CNQX900_SPIKES.png");
 
 
 
-plot(sum(contr_m, dims = 2),
- title = "Spikes per neuron: div 13 control", legend=false, ylim=(0,140))
-plot(sum(spikes_m_div13_cnqx900, dims = 2),
- title = "Spikes per neuron: div 13 CNQX 900", legend=false,ylim=(0,140))
+plot(sum(contr_m, dims = 2)/size(contr_m,2),
+ title = "Spikes per neuron: div 13 control", legend=false, ylim = (0,0.0012))
+plot(sum(spikes_m_div13_cnqx900/size(spikes_m_div13_cnqx900,2), dims = 2),
+ title = "Spikes per neuron: div 13 CNQX 900", legend=false, ylim = (0,0.0012))
 histogram(sum(spikes_m_div13_cnqx900, dims = 2), bins = 200, xlim = (0,30))
 histogram(sum(contr_m, dims = 2), bins = 200, xlim = (0,30))
 plot(sum(spikes_m_div17_10mwash, dims = 2), 
