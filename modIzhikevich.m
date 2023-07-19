@@ -3,7 +3,7 @@
 
 %% SET UP THE NETWORK
 close all;
-%clear all;
+clear all;
 
 % 1- NETWORK SIZE:
 A = readmatrix("C:\Users\stefa\Documents\Masterarbeit\grow_axons\test_colonies\W_2023-07-07_14-47-00.243216.txt");
@@ -11,7 +11,7 @@ sprintf("Begin: %s", datetime)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 2000; % time steps
+T = 20000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -40,7 +40,7 @@ d=[8-6*re.^2; 2*ones(Ni,1)];
 % Increase the max. excitatory weigth to induce synchronization.
 % Be careful. The balance between excitation and inhibition governs the
 % dynamics of the network!
-MAX_EXC_WEIGTH=10; MAX_INH_WEIGTH=1; 
+MAX_EXC_WEIGTH=10; MAX_INH_WEIGTH=2; 
 S = A;
 S(S>0) = MAX_EXC_WEIGTH*S(S>0).*rand(size(S(S>0)));
 S(S<0) = MAX_INH_WEIGTH*S(S<0).*rand(size(S(S<0)));
@@ -48,7 +48,7 @@ S_0 = S;
 
 % 6 - DEFINE NOISE STRENGTH. Remember that noise (or random inputs) is the
 % main drive of spontaneous activity. Default is around 5. 
-NOISE_MAX=5;
+NOISE_MAX=7;
 
 
 %% MAIN SIMULATION:
@@ -64,22 +64,31 @@ firings=false(Ne+Ni,1); % spike timings
 spike_m = false(Ne+Ni,T);
 I = zeros(1,Ne+Ni);
 
-%plasticity related
+% Hebbian plasticity 
 plAmps = zeros(Ne + Ni,1);
+plAmpsHist = zeros(Ne + Ni,T);
 delta_w = zeros(Ne + Ni, Ne + Ni);
-beta_hebb = 0.02;
-tauA = 4;
+beta_hebb = 0.1;
+tauA = 20;
+
+% synaptic depression
 synDs = ones(Ne+Ni,1);
+synDsHist = zeros(Ne + Ni,T);
 beta_depr = 0.8;
-tauD = 500;
+tauD = 50;
+
+%synaptic scaling
+synScalingInterval = 100; %ms
+sfHist = zeros(Ne + Ni,ceil(T/synScalingInterval));
+
 
 %chemicals effects
 gamma = ones(T+1, Ne+Ni); % CNQX effects
-tPlusCnqx = 100; %CNQX added
+tPlusCnqx = 2000; %CNQX added
 gCNQXplus = 0.2;
 gCNQXplusMax = 0.5;
 tauRel = 200; %ms
-tCnqxWashoff = 1000;
+tCnqxWashoff = 15000;
 gCNQXminus = 1.5;
 
 % debug vars
@@ -105,24 +114,26 @@ for t=1:T % simulation of T ms
     S = S + delta_w;
     
     % synaptic scaling
-    if (mod(t, 100) == 0) 
+    if (mod(t, synScalingInterval) == 0) 
         colsum = sum(S,1);
         sf = (colsums_weights_0 ./ colsum);
+        sfHist(:, t/synScalingInterval) = sf;
         S = S .* sf;
     end    
     
-    % % chemical environment factors
-    % if (t == tPlusCnqx)
-    %     gamma(t,1:(Ne-1)) = gCNQXplus;
-    % elseif (t == tCnqxWashoff) 
-    %     gamma(t,1:(Ne-1)) = gCNQXminus;
-    % end
-    % 
-    % if (t > tPlusCnqx && t < tCnqxWashoff)
-    %     gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (gCNQXplusMax - gamma(t-1,1:(Ne-1)))/tauRel;
-    % elseif (t > tCnqxWashoff)
-    %     gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (1 - gamma(t-1,1:(Ne-1)))/tauRel;
-    % end
+    % chemical environment factors
+    if (t == tPlusCnqx)
+        gamma(t,1:(Ne-1)) = gCNQXplus;
+    elseif (t == tCnqxWashoff) 
+        gamma(t,1:(Ne-1)) = 1;
+    end
+
+    if (t > tPlusCnqx && t < tCnqxWashoff)
+        gamma(t,1:(Ne-1)) = gCNQXplus;
+        %gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (gCNQXplusMax - gamma(t-1,1:(Ne-1)))/tauRel;
+    elseif (t > tCnqxWashoff)
+        gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (1 - gamma(t-1,1:(Ne-1)))/tauRel;
+    end
 
     %allweightsums(t) = sum(S, "all");
 
@@ -137,9 +148,12 @@ for t=1:T % simulation of T ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % for numerical
     u=u+a.*(b.*v-u); % stability
     
+    plAmpsHist(:, t) = plAmps; 
     plAmps = plAmps - plAmps / tauA;
     plAmps(plAmps < 0 ) = 0;
-    synDs(fired) = beta_depr*synDs(fired);
+
+    synDsHist(:, t) = synDs; 
+    synDs(fired) = beta_depr*synDs(fired); %the less synD, the more active the neuron!
     synDs = synDs + (1-synDs)/tauD;
 end
 sprintf("End: %s", datetime)
@@ -186,8 +200,10 @@ movegui
 subplot(2,1,1);
 imagesc(S)
 title("Weights after simulation")
+set(gca, 'ColorScale', 'log')
 colormap hot
 colorbar
+
 subplot(2,1,2);
 imagesc(S_0)
 title("Weights before simulation")
