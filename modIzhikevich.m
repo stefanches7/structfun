@@ -11,7 +11,7 @@ sprintf("Begin: %s", datetime)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 %Ne = 700; Ni = 300;
-T = 20000; % time steps
+T = 1000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -40,7 +40,7 @@ d=[8-6*re.^2; 2*ones(Ni,1)];
 % Increase the max. excitatory weigth to induce synchronization.
 % Be careful. The balance between excitation and inhibition governs the
 % dynamics of the network!
-MAX_EXC_WEIGTH=10; MAX_INH_WEIGTH=2; 
+MAX_EXC_WEIGTH=10; MAX_INH_WEIGTH=.5; 
 S = A;
 S(S>0) = MAX_EXC_WEIGTH*S(S>0).*rand(size(S(S>0)));
 S(S<0) = MAX_INH_WEIGTH*S(S<0).*rand(size(S(S<0)));
@@ -48,7 +48,7 @@ S_0 = S;
 
 % 6 - DEFINE NOISE STRENGTH. Remember that noise (or random inputs) is the
 % main drive of spontaneous activity. Default is around 5. 
-NOISE_MAX=7;
+NOISE_MAX=5;
 
 
 %% MAIN SIMULATION:
@@ -68,7 +68,8 @@ I = zeros(1,Ne+Ni);
 plAmps = zeros(Ne + Ni,1);
 plAmpsHist = zeros(Ne + Ni,T);
 delta_w = zeros(Ne + Ni, Ne + Ni);
-beta_hebb = 0.1;
+beta_hebb = 0.02;
+%overshoot_sub_rate = 0.8;
 tauA = 20;
 
 % synaptic depression
@@ -76,9 +77,11 @@ synDs = ones(Ne+Ni,1);
 synDsHist = zeros(Ne + Ni,T);
 beta_depr = 0.8;
 tauD = 50;
+SHist = zeros(Ne + Ni, Ne + Ni, T);
 
 %synaptic scaling
-synScalingInterval = 100; %ms
+synScalingInterval = 1; %ms
+tauSS = 330; %ms
 sfHist = zeros(Ne + Ni,ceil(T/synScalingInterval));
 
 
@@ -108,19 +111,29 @@ for t=1:T % simulation of T ms
     % Hebbian plasticity
     plAmps(fired) = plAmps(fired) + beta_hebb;
     delta_w = zeros(Ne + Ni, Ne + Ni);
+    delta_w(:, firings) = (delta_w(:, firings) - plAmps).*neurontype_idx(firings)';
     delta_w(firings,:) = delta_w(firings,:) + (plAmps.*neurontype_idx)';
-    delta_w(:, firings) = delta_w(:, firings) - plAmps.*neurontype_idx;
+    
+
     delta_w(A==0) = 0;
+    
+    % do not let excitatory weights be negative, inhibitory positive
+    % overshoot_exc = find(delta_w(:,1:(Ne-1)) < -S(:,1:(Ne-1)));
+    % overshoot_inh = find(delta_w(:,(Ne):(Ne+Ni)) > -S(:,(Ne):(Ne+Ni)));
+    % delta_w(overshoot_exc) = -S(overshoot_exc);
+    % delta_w(overshoot_inh) = -S(overshoot_inh);
+
+    
+
     S = S + delta_w;
     
-    % synaptic scaling
-    if (mod(t, synScalingInterval) == 0) 
-        colsum = sum(S,1);
-        sf = (colsums_weights_0 ./ colsum);
-        sfHist(:, t/synScalingInterval) = sf;
-        S = S .* sf;
-    end    
-    
+    overshoot_exc = S(:, 1:(Ne-1)) < 0;
+    overshoot_inh = S(:, Ne:(Ne+Ni)) > 0;
+    idx = [overshoot_exc , overshoot_inh];
+    S(idx) = 0;
+    S(idx) = 0;
+
+
     % chemical environment factors
     if (t == tPlusCnqx)
         gamma(t,1:(Ne-1)) = gCNQXplus;
@@ -134,6 +147,19 @@ for t=1:T % simulation of T ms
     elseif (t > tCnqxWashoff)
         gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (1 - gamma(t-1,1:(Ne-1)))/tauRel;
     end
+
+    % synaptic scaling
+    if (mod(t, synScalingInterval) == 0) 
+        colsum = sum(S,1);
+        sf =  (gamma(t,:).*colsums_weights_0 - colsum)/tauSS;
+        sfHist(:, t/synScalingInterval) = sf;
+        delta = repmat(sf./abs(sum(A,1)), Ne+Ni, 1);
+        delta(A==0) = 0;
+        S = S + delta;
+    end    
+
+    SHist(:,:,t) = S;
+    
 
     %allweightsums(t) = sum(S, "all");
 
