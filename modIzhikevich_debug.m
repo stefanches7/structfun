@@ -1,6 +1,5 @@
 % Created by Eugene M. Izhikevich, February 25, 2003
 % Excitatory neurons Inhibitory neurons
-% Noviz run on cluster version
 
 %% SET UP THE NETWORK
 close all;
@@ -55,30 +54,37 @@ NOISE_MAX=5;
 %% MAIN SIMULATION:
 v=-65*ones(Ne+Ni,1); % Initial values of v
 u=b.*v; % Initial values of u
+v_hist = zeros(Ne+Ni, T);
+u_hist = zeros(Ne+Ni, T);
 rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 
-spike_m = zeros(Ne+Ni, T);
 ga = zeros(T,1) ;
 
 colsums_weights_0 = sum(S, 1);
 firings=false(Ne+Ni,1); % spike timings
+spike_m = false(Ne+Ni,T);
 I = zeros(1,Ne+Ni);
 
 % Hebbian plasticity 
 plAmps = zeros(Ne + Ni,1);
+plAmpsHist = zeros(Ne + Ni,T);
 delta_w = zeros(Ne + Ni, Ne + Ni);
 beta_hebb = 0.02;
+%overshoot_sub_rate = 0.8;
 tauA = 20;
 
 % synaptic depression
 synDs = ones(Ne+Ni,1);
+synDsHist = zeros(Ne + Ni,T);
 beta_depr = 0.8;
 tauD = 50;
+SHist = zeros(Ne + Ni, Ne + Ni, T);
 
 %synaptic scaling
 synScalingInterval = 1; %ms
 tauSS = 330; %ms
+sfHist = zeros(Ne + Ni,ceil(T/synScalingInterval));
 
 
 %chemicals effects
@@ -90,6 +96,10 @@ tauRel = 200; %ms
 tCnqxWashoff = 15000;
 gCNQXminus = 1.5;
 
+% debug vars
+%allweightsums = zeros(T, 1);
+%colsums = zeros(Ne+Ni, T);
+%S_hist = zeros(Ne+Ni,Ne+Ni, T);
 
 for t=1:T % simulation of T ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
@@ -144,10 +154,16 @@ for t=1:T % simulation of T ms
     if (mod(t, synScalingInterval) == 0) 
         colsum = sum(S,1);
         sf =  (gamma(t,:).*colsums_weights_0 - colsum)/tauSS;
+        sfHist(:, t/synScalingInterval) = sf;
         delta = repmat(sf./abs(sum(A,1)), Ne+Ni, 1);
         delta(A==0) = 0;
         S = S + delta;
     end    
+
+    SHist(:,:,t) = S;
+    
+
+    %allweightsums(t) = sum(S, "all");
 
     v(fired)=c(fired);
     u(fired)=u(fired)+d(fired);
@@ -159,38 +175,44 @@ for t=1:T % simulation of T ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % step 0.5 ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % for numerical
     u=u+a.*(b.*v-u); % stability
-
+    v_hist(:, t) = v;
+    u_hist(:, t) = u;
+    
+    plAmpsHist(:, t) = plAmps; 
     plAmps = plAmps - plAmps / tauA;
     plAmps(plAmps < 0 ) = 0;
- 
+
+    synDsHist(:, t) = synDs; 
     synDs(fired) = beta_depr*synDs(fired); %the less synD, the more active the neuron!
     synDs = synDs + (1-synDs)/tauD;
 end
 sprintf("End: %s", datetime)
 %% PLOT RESULTS
 % Raster plot. Time on X, neuron on Y.
-mkdir("plots")
+figure;
 imagesc(spike_m)
 colormap hot
-save(gcf, "plots/spike_raster.png")
 
+
+figure
+movegui
+t_end = size(spike_m, 2);
 subplot(2,1,1)
 plot(sum(spike_m, 1)/size(spike_m,1))
 title("Network bursting")
 xlabel("Time")
 ylabel("Global network activity")
 subplot(2,1,2)
-subset = 1:T;
+subset = (t_end-200):t_end;
 plot(sum(spike_m(:,subset), 2)/size(spike_m(:,subset),2))
 title(sprintf("Neuron loudness at timesteps %d:%d", subset(1), subset(end)))
 xlabel("Neuron index")
 ylabel("Fraction of time fired")
-save(gcf, "plots/ga.png")
-
 
 %% firing statistics
 % rowsums should be preserved in synaptic scaling
-
+figure
+movegui
 subplot(2,1,1)
 hist(sum(S_0,2), 100)
 title("Weights before simulation")
@@ -202,8 +224,6 @@ hist(sum(S,2), 100)
 title("Weights after simulation")
 xlabel("Weight magnitude")
 ylabel("Count")
-
-save(gcf, "plots/weights_change_hist.png")
 
 figure
 movegui
@@ -219,6 +239,20 @@ title("Weights before simulation")
 colormap hot
 colorbar
 
-
-save(gcf, "plots/weights_change_heatmap.png")
+%% rate correlations
+% bin_size = 100; %ms
+% binned_spikes = zeros(Ne+Ni, T/bin_size);
+% for i=1:(T/bin_size - 1)
+%     for nidx=1:Ne+Ni
+%         binned_spikes(nidx,i)=sum(spike_m(nidx, i*bin_size:(i+1)*bin_size))*bin_size/1000;
+%     end
+% end
+% 
+% figure;
+% c = corr(transpose(binned_spikes), 'Type', 'Spearman', 'rows','complete');
+% corrplot = reshape(c, numel(c),1);
+% hist(corrplot, 100)
+% title("Correlation of spike trains")
+% xlabel("Pearson rho")
+% ylabel("Count spike train pairs")
 
