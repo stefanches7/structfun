@@ -8,10 +8,14 @@ clear all;
 
 % 1- NETWORK SIZE:
 A = readmatrix("test_adjacency_mtx.txt");
-sprintf("Begin: %s", datetime)
+begin_t = datetime;
+sprintf("Begin: %s", begin_t)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
-T = 50000; % time steps
+datatrace_root = "ml_sim_data";
+mkdir(datatrace_root)
+
+T = 10000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -44,11 +48,11 @@ u=b.*v; % Initial values of u
 rowsums_weights = sum(A,1); % for homeostasis
 neurontype_idx = [ones(Ne,1); -ones(Ni,1)];
 
-spike_m = zeros(Ne+Ni, T);
-ga = zeros(T,1) ;
+buffer_writing_interval = 10000;
+ga = zeros(T,1);
 
 colsums_weights_0 = sum(S, 1);
-firings=false(Ne+Ni,1); % spike timings
+firings=[]; % spike timings
 I = zeros(1,Ne+Ni);
 
 % Hebbian plasticity 
@@ -74,12 +78,14 @@ gCNQXplus = 0.2;
 tCnqxWashoff = 4*T/5;
 gCNQXminus = 1;
 
+firings_a = zeros(buffer_writing_interval*(Ne+Ni), 2);
 
 for t=1:T % simulation of T ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
     fired=find(v>=30); % indices of spikes
     firings = false(Ne+Ni, 1);
     firings(fired) = true;
+    firings_a=[firings_a; t+0*fired,fired];
     spike_m(fired, t) = true;
 
     ga(t) = sum(firings) / length(firings);
@@ -124,12 +130,34 @@ for t=1:T % simulation of T ms
     end
 
     % synaptic scaling
-    if (mod(t, synScalingInterval) == 0) 
+    if (mod(t, synScalingInterval) == 0)
+        fname = sprintf("weights_%s", begin_t);
+        fileID = fopen(fullfile(datatrace_root, fname), "w");
+        for i=1:(Ne+Ni)
+            for j=1:(Ne+Ni)
+                w = S(i,j);
+                if ( w ~= 0)
+                    fprintf(fileID,'%d %d %d %.2f\n',t, i, j, w);
+                end
+            end
+        end
+
+        fclose(fileID);
+
         colsum = sum(S,1);
         sf =  (gamma' .* colsums_weights_0 - colsum)/tauSS;
         delta = repmat(sf./abs(sum(A,1)), Ne+Ni, 1);
         delta(A==0) = 0;
         S = S + delta;
+    end    
+
+    if (mod(t, buffer_writing_interval) == 0) 
+        fname = sprintf("spikes_%s", begin_t);
+        fileID = fopen(fullfile(datatrace_root, fname), "w");
+        for i=1:size(firings_a, 1)
+            fprintf(fileID,'%d %d\n',firings_a(i,:));
+        end
+        fclose(fileID);
     end    
 
     v(fired)=c(fired);
