@@ -11,8 +11,7 @@ A = readmatrix("test_adjacency_mtx.txt");
 sprintf("Begin: %s", datetime)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
-%Ne = 700; Ni = 300;
-T = 60000; % time steps
+T = 50000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -22,19 +21,6 @@ a=[0.02*ones(Ne,1); 0.02+0.08*ri];
 b=[0.2*ones(Ne,1); 0.25-0.05*ri];
 c=[-65+15*re.^2; -65*ones(Ni,1)];
 d=[8-6*re.^2; 2*ones(Ni,1)];
-
-% 3 - SET UP THE CONNECTIVITY MATRIX: DIRECTED NETWORK
-% In this construction, 1=connection exist, 0=no connection.
-% Connectivity is set as random. Then, a fraction of connections are set 0.
-% Note that effectively this is an Erdös-Rényi graphs, with no spatial
-% characteristics. % If you want to symmetrize the network to make 
-% undirected networks (not realistic in neuroscience), use A = (A + A.')/2
-% after line 27.
-% frac_delete=0.6; % Set this fraction of connections to zero.
-% A=[rand(Ne+Ni)];
-% A(A<frac_delete)=0;
-% A(A>0)=1;
-% A = A - diag(diag(A)); % Make the diagonal elements 0 (no self-connection).
 
 % 4 - SET SYNAPTIC WEIGHTS (STRENGTHS) OF CONNECTIONS.
 % I represents the amnplitudes of evoked currents (EPSC and IPSC). 
@@ -77,18 +63,16 @@ beta_depr = 0.8;
 tauD = 50;
 
 %synaptic scaling
-synScalingInterval = 1; %ms
+synScalingInterval = 1000; %ms
 tauSS = 330; %ms
 
 
 %chemicals effects
-gamma = ones(T+1, Ne+Ni); % CNQX effects
-tPlusCnqx = 2000; %CNQX added
+gamma = ones(Ne+Ni,1); % CNQX effects
+tPlusCnqx = T/5; %CNQX added
 gCNQXplus = 0.2;
-gCNQXplusMax = 0.5;
-tauRel = 200; %ms
-tCnqxWashoff = 15000;
-gCNQXminus = 1.5;
+tCnqxWashoff = 4*T/5;
+gCNQXminus = 1;
 
 
 for t=1:T % simulation of T ms
@@ -128,22 +112,21 @@ for t=1:T % simulation of T ms
 
     % chemical environment factors
     if (t == tPlusCnqx)
-        gamma(t,1:(Ne-1)) = gCNQXplus;
+        gamma(1:(Ne-1)) = gCNQXplus;
     elseif (t == tCnqxWashoff) 
-        gamma(t,1:(Ne-1)) = 1;
+        gamma(1:(Ne-1)) = gCNQXminus;
     end
 
     if (t > tPlusCnqx && t < tCnqxWashoff)
-        gamma(t,1:(Ne-1)) = gCNQXplus;
-        %gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (gCNQXplusMax - gamma(t-1,1:(Ne-1)))/tauRel;
+        gamma(1:(Ne-1)) = gCNQXplus;
     elseif (t > tCnqxWashoff)
-        gamma(t,1:(Ne-1)) = gamma(t-1,1:(Ne-1)) + (1 - gamma(t-1,1:(Ne-1)))/tauRel;
+        gamma(1:(Ne-1)) = gCNQXminus;
     end
 
     % synaptic scaling
     if (mod(t, synScalingInterval) == 0) 
         colsum = sum(S,1);
-        sf =  (gamma(t,:).*colsums_weights_0 - colsum)/tauSS;
+        sf =  (gamma' .* colsums_weights_0 - colsum)/tauSS;
         delta = repmat(sf./abs(sum(A,1)), Ne+Ni, 1);
         delta(A==0) = 0;
         S = S + delta;
@@ -154,7 +137,7 @@ for t=1:T % simulation of T ms
 
     I=I+sum(S(:,fired).* ...
         (synDs(fired))' .* ... %synaptic metabolites exhaustion
-        gamma(t,fired) ... %CNQX addition modificator
+        gamma(fired)' ... %CNQX addition modificator
         ,2);
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % step 0.5 ms
     v=v+0.5*(0.04*v.^2+5*v+140-u+I); % for numerical
@@ -172,7 +155,7 @@ sprintf("End: %s", datetime)
 mkdir("plots")
 imagesc(spike_m)
 colormap hot
-save(gcf, "plots/spike_raster.png")
+saveas(gcf, "plots/spike_raster.png")
 
 subplot(2,1,1)
 plot(sum(spike_m, 1)/size(spike_m,1))
@@ -185,7 +168,7 @@ plot(sum(spike_m(:,subset), 2)/size(spike_m(:,subset),2))
 title(sprintf("Neuron loudness at timesteps %d:%d", subset(1), subset(end)))
 xlabel("Neuron index")
 ylabel("Fraction of time fired")
-save(gcf, "plots/ga.png")
+saveas(gcf, "plots/ga.png")
 
 
 %% firing statistics
@@ -193,17 +176,17 @@ save(gcf, "plots/ga.png")
 
 subplot(2,1,1)
 hist(sum(S_0,2), 100)
-title("Weights before simulation")
-xlabel("Weight magnitude")
+title("Column weight sums before simulation")
+xlabel("Sum magnitude")
 ylabel("Count")
 
 subplot(2,1,2)
 hist(sum(S,2), 100)
-title("Weights after simulation")
-xlabel("Weight magnitude")
+title("Column weight sums after simulation")
+xlabel("Sum magnitude")
 ylabel("Count")
 
-save(gcf, "plots/weights_change_hist.png")
+saveas(gcf, "plots/weights_change_hist.png")
 
 figure
 movegui
@@ -220,5 +203,5 @@ colormap hot
 colorbar
 
 
-save(gcf, "plots/weights_change_heatmap.png")
+saveas(gcf, "plots/weights_change_heatmap.png")
 
