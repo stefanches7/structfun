@@ -12,10 +12,10 @@ begin_t = datetime;
 sprintf("Begin: %s", begin_t)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
-datatrace_root = "ml_sim_data";
+datatrace_root = "/gpfs/scratch/pn98bi/ge72puf2/ml_sim_data";
 mkdir(datatrace_root)
 
-T = 10000; % time steps
+T = 2*3600*1000; % time steps
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -75,10 +75,10 @@ tauSS = 330; %ms
 gamma = ones(Ne+Ni,1); % CNQX effects
 tPlusCnqx = T/5; %CNQX added
 gCNQXplus = 0.2;
-tCnqxWashoff = 4*T/5;
+tCnqxWashoff = 3*T/5;
 gCNQXminus = 1;
 
-firings_a = zeros(buffer_writing_interval*(Ne+Ni), 2);
+firings_a = [];
 
 for t=1:T % simulation of T ms
     I=[NOISE_MAX*randn(Ne,1);2*randn(Ni,1)]; % NOISE or thalamic input
@@ -132,7 +132,7 @@ for t=1:T % simulation of T ms
     % synaptic scaling
     if (mod(t, synScalingInterval) == 0)
         fname = sprintf("weights_%s", begin_t);
-        fileID = fopen(fullfile(datatrace_root, fname), "w");
+        fileID = fopen(fullfile(datatrace_root, fname), "a");
         for i=1:(Ne+Ni)
             for j=1:(Ne+Ni)
                 w = S(i,j);
@@ -153,11 +153,12 @@ for t=1:T % simulation of T ms
 
     if (mod(t, buffer_writing_interval) == 0) 
         fname = sprintf("spikes_%s", begin_t);
-        fileID = fopen(fullfile(datatrace_root, fname), "w");
+        fileID = fopen(fullfile(datatrace_root, fname), "a");
         for i=1:size(firings_a, 1)
             fprintf(fileID,'%d %d\n',firings_a(i,:));
         end
         fclose(fileID);
+	firings_a = [];
     end    
 
     v(fired)=c(fired);
@@ -181,22 +182,6 @@ sprintf("End: %s", datetime)
 %% PLOT RESULTS
 % Raster plot. Time on X, neuron on Y.
 mkdir("plots")
-imagesc(spike_m)
-colormap hot
-saveas(gcf, "plots/spike_raster.png")
-
-subplot(2,1,1)
-plot(sum(spike_m, 1)/size(spike_m,1))
-title("Network bursting")
-xlabel("Time")
-ylabel("Global network activity")
-subplot(2,1,2)
-subset = 1:T;
-plot(sum(spike_m(:,subset), 2)/size(spike_m(:,subset),2))
-title(sprintf("Neuron loudness at timesteps %d:%d", subset(1), subset(end)))
-xlabel("Neuron index")
-ylabel("Fraction of time fired")
-saveas(gcf, "plots/ga.png")
 
 
 %% firing statistics
