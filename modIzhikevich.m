@@ -13,9 +13,12 @@ sprintf("Begin: %s", begin_t)
 Pe = 0.8; % excitatory fraction; change in grow_axons
 Ne=ceil(Pe*size(A, 1)); Ni=floor((1-Pe)*size(A, 1)); % Excitatory, inhibitory. Ne+Ni is total neurons.
 datatrace_root = "/gpfs/scratch/pn98bi/ge72puf2/ml_sim_data";
+plots_dir = strcat(datatrace_root, "/plots");
 mkdir(datatrace_root)
-
-T = 2*3600*1000; % time steps
+mkdir(plots_dir)
+%/gpfs/scratch/pn98bi/ge72puf2/ml_sim_data
+T = 600*1000; % time steps
+%T = 30000;
 % 2 - GLOBAL PARAMETERS THAT SET OUR NEURON MODEL. DEFAULT IS SPIKING
 % NEURON:
 % Set initial conditions of neurons, with some variability provided by the
@@ -73,9 +76,9 @@ tauSS = 330; %ms
 
 %chemicals effects
 gamma = ones(Ne+Ni,1); % CNQX effects
-tPlusCnqx = T/5; %CNQX added
+tPlusCnqx = T/12; %CNQX added
 gCNQXplus = 0.2;
-tCnqxWashoff = 3*T/5;
+tCnqxWashoff = 5*T/6;
 gCNQXminus = 1;
 
 firings_a = [];
@@ -100,10 +103,10 @@ for t=1:T % simulation of T ms
     delta_w(A==0) = 0;
     
     % do not let excitatory weights be negative, inhibitory positive
-    % overshoot_exc = find(delta_w(:,1:(Ne-1)) < -S(:,1:(Ne-1)));
-    % overshoot_inh = find(delta_w(:,(Ne):(Ne+Ni)) > -S(:,(Ne):(Ne+Ni)));
-    % delta_w(overshoot_exc) = -S(overshoot_exc);
-    % delta_w(overshoot_inh) = -S(overshoot_inh);
+    overshoot_exc = find(delta_w(:,1:(Ne-1)) < -S(:,1:(Ne-1)));
+    overshoot_inh = find(delta_w(:,(Ne):(Ne+Ni)) > -S(:,(Ne):(Ne+Ni)));
+    delta_w(overshoot_exc) = -S(overshoot_exc);
+    delta_w(overshoot_inh) = -S(overshoot_inh);
 
     
 
@@ -117,21 +120,30 @@ for t=1:T % simulation of T ms
 
 
     % chemical environment factors
-    if (t == tPlusCnqx)
-        gamma(1:(Ne-1)) = gCNQXplus;
-    elseif (t == tCnqxWashoff) 
-        gamma(1:(Ne-1)) = gCNQXminus;
-    end
-
-    if (t > tPlusCnqx && t < tCnqxWashoff)
-        gamma(1:(Ne-1)) = gCNQXplus;
-    elseif (t > tCnqxWashoff)
-        gamma(1:(Ne-1)) = gCNQXminus;
-    end
+%    if (t == tPlusCnqx)
+%        gamma(1:(Ne-1)) = gCNQXplus;
+%    elseif (t == tCnqxWashoff) 
+%        gamma(1:(Ne-1)) = gCNQXminus;
+%    end
+%
+%    if (t > tPlusCnqx && t < tCnqxWashoff)
+%        gamma(1:(Ne-1)) = gCNQXplus;
+%    elseif (t > tCnqxWashoff)
+%        gamma(1:(Ne-1)) = gCNQXminus;
+%    end
 
     % synaptic scaling
     if (mod(t, synScalingInterval) == 0)
-        fname = sprintf("weights_%s", begin_t);
+        colsum = sum(S,1);
+        sf =  (gamma' .* colsums_weights_0 - colsum)/tauSS;
+        delta = repmat(sf./abs(sum(A,1)), Ne+Ni, 1);
+        delta(A==0) = 0;
+        S = S + delta;
+    end    
+	
+    printlabel = "10min_STDP_synscaling";
+    if (mod(t, buffer_writing_interval) == 0) 
+        fname = sprintf("weights_%s", printlabel);
         fileID = fopen(fullfile(datatrace_root, fname), "a");
         for i=1:(Ne+Ni)
             for j=1:(Ne+Ni)
@@ -144,15 +156,21 @@ for t=1:T % simulation of T ms
 
         fclose(fileID);
 
-        colsum = sum(S,1);
-        sf =  (gamma' .* colsums_weights_0 - colsum)/tauSS;
-        delta = repmat(sf./abs(sum(A,1)), Ne+Ni, 1);
-        delta(A==0) = 0;
-        S = S + delta;
-    end    
+        fname = sprintf("synDs_%s", printlabel);
+        fileID = fopen(fullfile(datatrace_root, fname), "a");
+        for i=1:size(synDs, 1)
+            fprintf(fileID,'%d %d\n',t, synDs(i,:));
+        end
+        fclose(fileID);
 
-    if (mod(t, buffer_writing_interval) == 0) 
-        fname = sprintf("spikes_%s", begin_t);
+        fname = sprintf("plAmps_%s", printlabel);
+        fileID = fopen(fullfile(datatrace_root, fname), "a");
+        for i=1:size(plAmps, 1)
+            fprintf(fileID,'%d %d\n',t, plAmps(i,:));
+        end
+        fclose(fileID);
+        
+        fname = sprintf("spikes_%s", printlabel);
         fileID = fopen(fullfile(datatrace_root, fname), "a");
         for i=1:size(firings_a, 1)
             fprintf(fileID,'%d %d\n',firings_a(i,:));
@@ -175,8 +193,8 @@ for t=1:T % simulation of T ms
     plAmps = plAmps - plAmps / tauA;
     plAmps(plAmps < 0 ) = 0;
  
-    synDs(fired) = beta_depr*synDs(fired); %the less synD, the more active the neuron!
-    synDs = synDs + (1-synDs)/tauD;
+%    synDs(fired) = beta_depr*synDs(fired); %the less synD, the more active the neuron!
+%    synDs = synDs + (1-synDs)/tauD;
 end
 sprintf("End: %s", datetime)
 %% PLOT RESULTS
@@ -199,7 +217,8 @@ title("Column weight sums after simulation")
 xlabel("Sum magnitude")
 ylabel("Count")
 
-saveas(gcf, "plots/weights_change_hist.png")
+fname = fullfile(plots_dir, sprintf("weights_change_hist_%s.png", begin_t));
+saveas(gcf, fname)
 
 figure
 movegui
@@ -215,6 +234,6 @@ title("Weights before simulation")
 colormap hot
 colorbar
 
-
-saveas(gcf, "plots/weights_change_heatmap.png")
+fname = fullfile(plots_dir, sprintf("weights_change_heatmap_%s.png", begin_t));
+saveas(gcf, fname)
 
