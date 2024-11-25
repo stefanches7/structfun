@@ -1,0 +1,96 @@
+{
+  "$id": "https://openminds.om-i.org/types/Simulation?format=json-schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Structured information about a process of running simulations of a computational model.",
+  "properties": {
+    "@id": "https://doi.org/10.5281/zenodo.12611567",
+    "@type": "https://openminds.om-i.org/types/Simulation",
+    "https://openminds.om-i.org/props/customPropertySet": [],
+    "https://openminds.om-i.org/props/description": "This simulation explores plasticity rules in a biologically realistic simulation of neuronal cultures.",
+    "https://openminds.om-i.org/props/endTime": "2023-07-25T15:00:00Z",
+    "https://openminds.om-i.org/props/input": [
+      {
+        "@id": "10.5281/zenodo.12611566/structfun-main-code.zip/test_adjacency_mtx.txt",
+        "@type": "https://openminds.om-i.org/types/LocalFile"
+      },
+      {
+        "@id": "10.5281/zenodo.12611566/structfun-main-code.zip",
+        "@type": "https://openminds.om-i.org/types/FileBundle"
+      }
+    ],
+    "https://openminds.om-i.org/props/output": [
+      {
+        "@id": "10.5281/zenodo.12611566/structfun-main-code.zip",
+        "@type": "https://openminds.om-i.org/types/FileArchive"
+      }
+    ],
+    "https://openminds.om-i.org/props/lookupLabel": "Plasticity Simulation",
+    "https://openminds.om-i.org/props/performedBy": [
+      {
+        "@id": "https://orcid.org/0000-0001-7769-0167",
+        "@type": "https://openminds.om-i.org/types/Person"
+      }
+    ],
+    "https://openminds.om-i.org/props/environment": {
+      "@id": "https://doku.lrz.de/linux-cluster-10745672.html",
+      "@type": "https://openminds.om-i.org/types/Environment",
+      "description": "A university facility cluster equipped with primitive machines.",
+      "name": "LRZ Linux Cluster",
+      "software": [
+        {
+          "@id": "https://de.mathworks.com/products/new_products/release2023b.html",
+          "@type": "https://openminds.om-i.org/types/SoftwareVersion",
+          "name": "MATLAB 2023b"
+        }
+      ],
+      "hardware": [
+        {
+          "@id": "https://doku.lrz.de/coolmuc-2-11484376.html",
+          "@type": "https://openminds.om-i.org/types/HardwareConfiguration",
+          "name": "HPC Cluster",
+          "description": "The CoolMUC-2 cluster consists of 812 nodes, each with 28 Intel Xeon cores at 2.6 GHz and 64 GB DDR4 memory per node, achieving a bandwidth of 120 GB/s. Nodes are interconnected via FDR14 Infiniband with 13.64 GB/s bandwidth per node."
+        }
+      ]
+    },
+    "https://openminds.om-i.org/props/analysisTechnique": {
+      "@id": "http://purl.obolibrary.org/obo/APOLLO_SV_00000064",
+      "@type": "https://openminds.om-i.org/types/AnalysisTechnique",
+      "preferredOntologyIdentifier": "APOLLO:SV_00000064",
+      "name": "Simulation time series",
+      "description": "A time sampled measurement data set, where the position in the sequence of each data item corresponds to a specific time_step of the simulation."
+    },
+    "https://openminds.om-i.org/props/resourceUsage": {
+      "@type":"https://openminds.om-i.org/types/QuantitativeValue", 
+      "@id": "null",
+      "unit": "CPU hours",
+      "value": 20
+    }
+    ,
+    "https://openminds.om-i.org/props/startTime": ["2023-07-25T10:00:00Z"],
+    "https://openminds.om-i.org/props/studyTarget": [
+      "https://openminds.om-i.org/types/SubcellularEntity",
+      "https://openminds.om-i.org/types/CellCultureType"
+    ],
+    "https://openminds.om-i.org/props/tag": [
+      "plasticity",
+      "neuronal cultures",
+      "biologically realistic simulation"
+    ],
+    "https://openminds.om-i.org/props/wasInformedBy": [
+      {
+        "@type": "https://openminds.om-i.org/types/Simulation",
+        "@id": "https://doi.org/10.1038/nphys2686"
+      }
+    ]
+  },
+  "required": [
+    "@id",
+    "@type",
+    "https://openminds.om-i.org/props/environment",
+    "https://openminds.om-i.org/props/input",
+    "https://openminds.om-i.org/props/output",
+    "https://openminds.om-i.org/props/startTime"
+  ],
+  "title": "Simulation",
+  "type": "object"
+}
