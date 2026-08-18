@@ -15,7 +15,7 @@ r_soma = 7.5e-3 # soma size (mm)
 L = Lmu / np.sqrt(np.pi/2.0)
 
 M = int(np.pi*r**2*rho)
-X,Y = np.zeros(M),np.zeros(M)
+X,Y, Z = np.zeros(M),np.zeros(M), np.zeros(M)
 
 A = r*np.sqrt(np.random.rand())
 theta = 2*np.pi*np.random.rand() # long
@@ -35,7 +35,7 @@ for i in range(1,M):
         Z[0] = r + A * np.cos(phi)
       
 
-W,_,Xi,Yi = grow_axons.grow_NC_grid(  X, Y, Z
+W,_,Xi,Yi = grow_axons_3d.grow_NC_grid_3d(  X, Y, Z,
                                     Pe = 0.8,                   # fraction of excitatory neurons
                                     alphaE = 0.4, alphaI = 0.2, # connectivity prob.
                                     L_mu_E = L, L_mu_I = L,     # mean exc/inh axon length
